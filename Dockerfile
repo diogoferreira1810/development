@@ -14,8 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 COPY test_app.py .
 
-# Run tests during build (optional)
-RUN pytest test_app.py -v
+# Run tests during build (optional - can be skipped if tests already ran in CI)
+# Uncomment the line below to run tests during Docker build:
+# RUN pytest test_app.py -v
 
 # Set the command to run the application
 CMD ["python", "app.py"]

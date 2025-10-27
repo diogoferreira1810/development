@@ -1,0 +1,11 @@
+# Production Dockerfile - Minimal image without dev dependencies
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy only application code (no tests)
+COPY app.py .
+
+# Run the application
+CMD ["python", "app.py"]
