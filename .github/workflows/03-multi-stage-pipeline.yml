@@ -24,6 +24,10 @@ env:
   PYTHON_VERSION: '3.11'
   APP_NAME: 'calculator-app'
 
+# Explicitly set minimal permissions for security
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build
