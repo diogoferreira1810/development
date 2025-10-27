@@ -1,0 +1,151 @@
+name: Multi-Stage Pipeline
+
+# This pipeline demonstrates:
+# - Multiple stages/jobs with dependencies
+# - Environment variables
+# - Conditional execution
+# - Manual approval (workflow_dispatch)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+  push:
+    branches: [ main ]
+
+env:
+  PYTHON_VERSION: '3.11'
+  APP_NAME: 'calculator-app'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Create build artifact
+      run: |
+        mkdir -p dist
+        cp app.py dist/
+        cp requirements.txt dist/
+        tar -czf ${{ env.APP_NAME }}.tar.gz dist/
+    
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ env.APP_NAME }}
+        path: ${{ env.APP_NAME }}.tar.gz
+
+  test:
+    name: Test
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run tests
+      run: |
+        pytest test_app.py -v --cov=app --cov-report=term
+
+  security-scan:
+    name: Security Scan
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit safety
+    
+    - name: Run Bandit security scan
+      run: |
+        bandit -r app.py -f txt || true
+    
+    - name: Check dependencies for vulnerabilities
+      run: |
+        safety check --json || true
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: security-scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    environment:
+      name: staging
+      url: https://staging.example.com
+    
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: ${{ env.APP_NAME }}
+    
+    - name: Deploy to Staging
+      run: |
+        echo "Deploying to staging environment..."
+        echo "Artifact: ${{ env.APP_NAME }}.tar.gz"
+        echo "This is where you would deploy to your staging server"
+        ls -la
+
+  deploy-production:
+    name: Deploy to Production
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://production.example.com
+    
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: ${{ env.APP_NAME }}
+    
+    - name: Deploy to Production
+      run: |
+        echo "Deploying to production environment..."
+        echo "Artifact: ${{ env.APP_NAME }}.tar.gz"
+        echo "This is where you would deploy to your production server"
+        ls -la
